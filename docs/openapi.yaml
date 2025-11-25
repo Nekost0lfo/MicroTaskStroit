@@ -1,0 +1,661 @@
+openapi: 3.1.0
+info:
+  title: Stroit Backend Suite API
+  version: 1.0.0
+  description: |
+    API surface for the Stroit project gateway and microservices.
+    Paths are versioned (`/v1`) and all responses follow the `{ success, data, error }` contract.
+servers:
+  - url: https://dev.api.stroitproject.local
+    description: Development environment
+  - url: https://test.api.stroitproject.local
+    description: Test environment
+  - url: https://api.stroitproject.local
+    description: Production environment
+tags:
+  - name: Gateway
+    description: Routing, authentication enforcement, rate limiting, and observability headers
+  - name: Users
+    description: Registration, authentication, profile management, and admin user listings
+  - name: Orders
+    description: Order lifecycle, status management, and domain events
+paths:
+  /v1/health:
+    get:
+      tags:
+        - Gateway
+      summary: Gateway health readout
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /v1/status:
+    get:
+      tags:
+        - Gateway
+      summary: Gateway status endpoint
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /v1/users/health:
+    get:
+      tags:
+        - Users
+      summary: Users service health
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /v1/users/status:
+    get:
+      tags:
+        - Users
+      summary: Users service status
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /v1/users/register:
+    post:
+      tags:
+        - Users
+      summary: Register a new consumer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserRegistration"
+      responses:
+        "201":
+          description: Created user identifier
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/responses/Success"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        required: [id, email]
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                          email:
+                            type: string
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+
+  /v1/users/login:
+    post:
+      tags:
+        - Users
+      summary: Authenticate and receive a Bearer JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserLogin"
+      responses:
+        "200":
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: "#/components/responses/Success"
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          token:
+                            type: string
+                          expiresIn:
+                            type: string
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /v1/users/me:
+    get:
+      tags:
+        - Users
+      summary: Return the caller's profile
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          $ref: "#/components/responses/User"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    put:
+      tags:
+        - Users
+      summary: Update the caller's profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserProfileUpdate"
+      responses:
+        "200":
+          $ref: "#/components/responses/User"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /v1/users:
+    get:
+      tags:
+        - Users
+      summary: Paginated list of users (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: perPage
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - email
+              - name
+            default: createdAt
+        - in: query
+          name: order
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum:
+              - admin
+              - user
+        - in: query
+          name: email
+          schema:
+            type: string
+      responses:
+        "200":
+          $ref: "#/components/responses/UserList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /v1/orders/health:
+    get:
+      tags:
+        - Orders
+      summary: Orders service health endpoint
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /v1/orders/status:
+    get:
+      tags:
+        - Orders
+      summary: Orders service status endpoint
+      responses:
+        "200":
+          $ref: "#/components/responses/Success"
+
+  /v1/orders:
+    post:
+      tags:
+        - Orders
+      summary: Create a new order for the current user
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderCreate"
+      responses:
+        "201":
+          $ref: "#/components/responses/Order"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+    get:
+      tags:
+        - Orders
+      summary: Paginated list of the caller's orders
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: perPage
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 10
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum:
+              - createdAt
+              - status
+            default: createdAt
+        - in: query
+          name: order
+          schema:
+            type: string
+            enum:
+              - asc
+              - desc
+            default: desc
+      responses:
+        "200":
+          $ref: "#/components/responses/OrderList"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /v1/orders/{orderId}:
+    get:
+      tags:
+        - Orders
+      summary: Retrieve a single order
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          $ref: "#/components/responses/Order"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /v1/orders/{orderId}/status:
+    patch:
+      tags:
+        - Orders
+      summary: Update the order status (admin only)
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OrderStatusUpdate"
+      responses:
+        "200":
+          $ref: "#/components/responses/Order"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /v1/orders/{orderId}/cancel:
+    post:
+      tags:
+        - Orders
+      summary: Cancel an existing order
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          $ref: "#/components/responses/Order"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    UserBase:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        name:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    UserRegistration:
+      type: object
+      required:
+        - email
+        - password
+        - name
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 8
+        name:
+          type: string
+    UserLogin:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+    UserProfileUpdate:
+      type: object
+      required: []
+      properties:
+        name:
+          type: string
+        password:
+          type: string
+          minLength: 8
+    OrderItem:
+      type: object
+      required:
+        - productId
+        - name
+        - quantity
+        - unitPrice
+      properties:
+        productId:
+          type: string
+        name:
+          type: string
+        quantity:
+          type: number
+          format: float
+          minimum: 1
+        unitPrice:
+          type: number
+          format: float
+          minimum: 0
+    OrderCreate:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+    Order:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+        status:
+          type: string
+          enum:
+            - created
+            - in_progress
+            - completed
+            - cancelled
+        total:
+          type: number
+          format: float
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    OrderStatusUpdate:
+      type: object
+      required:
+        - status
+      properties:
+        status:
+          type: string
+          enum:
+            - created
+            - in_progress
+            - completed
+            - cancelled
+    UserList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserBase"
+        page:
+          type: integer
+        perPage:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+    OrderList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Order"
+        page:
+          type: integer
+        perPage:
+          type: integer
+        total:
+          type: integer
+        totalPages:
+          type: integer
+    ErrorPayload:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+  responses:
+    Success:
+      description: Successful operation
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: true
+              data:
+                type: object
+    User:
+      description: User data
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/responses/Success"
+              - type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/UserBase"
+    Order:
+      description: Order data
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/responses/Success"
+              - type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Order"
+    UserList:
+      description: Paginated user list
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/responses/Success"
+              - type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/UserList"
+    OrderList:
+      description: Paginated order list
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/responses/Success"
+              - type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/OrderList"
+    BadRequest:
+      description: Validation failed
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: false
+              error:
+                $ref: "#/components/schemas/ErrorPayload"
+    Unauthorized:
+      description: Authentication required or invalid token
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: false
+              error:
+                $ref: "#/components/schemas/ErrorPayload"
+    Forbidden:
+      description: Insufficient permissions
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: false
+              error:
+                $ref: "#/components/schemas/ErrorPayload"
+    NotFound:
+      description: Resource was not found
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: false
+              error:
+                $ref: "#/components/schemas/ErrorPayload"
+    Conflict:
+      description: Entity conflict (e.g., duplicate email)
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              success:
+                type: boolean
+                const: false
+              error:
+                $ref: "#/components/schemas/ErrorPayload"
+

@@ -1,0 +1,45 @@
+services:
+  api_gateway:
+    build: api_gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - NODE_ENV=production
+      - PORT=8000
+      - JWT_SECRET=shared-secret
+      - USERS_SERVICE_URL=http://service_users:8100
+      - ORDERS_SERVICE_URL=http://service_orders:8200
+    depends_on:
+      - service_users
+      - service_orders
+    networks:
+      - app-network
+
+  service_users:
+    build: service_users
+    ports:
+      - "8100:8100"
+    environment:
+      - NODE_ENV=production
+      - PORT=8100
+      - JWT_SECRET=shared-secret
+      - SERVICE_TOKEN=system-token
+    networks:
+      - app-network
+
+  service_orders:
+    build: service_orders
+    ports:
+      - "8200:8200"
+    environment:
+      - NODE_ENV=production
+      - PORT=8200
+      - JWT_SECRET=shared-secret
+      - USER_SERVICE_URL=http://service_users:8100/v1
+      - SYSTEM_API_TOKEN=system-token
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
