@@ -36,7 +36,7 @@ const logger = pino({
 
 const app = express();
 
-app.set('trust proxy', true);
+app.set('trust proxy', 'loopback');
 
 const pinoMiddleware = pinoHttp({
     logger,

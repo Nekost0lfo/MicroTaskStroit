@@ -6,6 +6,8 @@ info:
     API surface for the Stroit project gateway and microservices.
     Paths are versioned (`/v1`) and all responses follow the `{ success, data, error }` contract.
 servers:
+  - url: http://localhost:8000
+    description: Local Docker Compose gateway (используется при `docker compose -f MicroTaskStroit/docker-compose.yml up`)
   - url: https://dev.api.stroitproject.local
     description: Development environment
   - url: https://test.api.stroitproject.local
